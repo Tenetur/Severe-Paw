@@ -3,101 +3,64 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
-{
-    [Header("Movement")]
-    public float moveSpeed;
+{   
 
-    public float groundDrag;
+    public CharacterController controller;
+    public new Camera camera;
 
-    public float jumpForce;
-    public float jumpCooldown;
-    public float airMultiplier;
-    bool readyToJump;
+    [SerializeField]
+    private float MoveSpeed = 6f;
+    private float moveDown = 5f;
 
-    [Header("Keybinds")]
-    public KeyCode jumpKey = KeyCode.Space;
+    public static bool isRunning { set; get; }
 
-    [Header("Ground Check")]
-    public float playerHeight;
-    public LayerMask whatIsGround;
-    bool grounded;
+    private readonly float turnSmoothTime = 0.1f;
+    private float turnSmoothVelocity;
 
-    public Transform orientation;
+    public KeyCode runKey = KeyCode.LeftControl;
 
-    private float horizontalInput;
-    private float verticalInput;
-
-    private Vector3 moveDirection;
-
-    private Rigidbody rb;
-
-    private void Start()
+    void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        rb.freezeRotation = true;
-
-        readyToJump = true;
+        controller = GetComponent<CharacterController>();
+        isRunning = false;
+        MoveSpeed = 6f;
     }
-    private void FixedUpdate()
-    {
-        MovePlayer();
-    }
-    private void Update()
-    {
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatIsGround);
 
-        MyInput();
-        SpeedControl();
+    void Update()
+    {     
+        // Получение направления движения
+        float horizontal = Input.GetAxisRaw("Horizontal");
+        float vertical = Input.GetAxisRaw("Vertical");
+        Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
 
-        if (grounded)
-            rb.drag = groundDrag;
-        else
-            rb.drag = 0;
-    }
-    private void MyInput()
-    {
-        horizontalInput = Input.GetAxisRaw("Horizontal");
-        verticalInput = Input.GetAxisRaw("Vertical");
-
-        if (Input.GetKey(jumpKey) && readyToJump && grounded)
+        if (direction.magnitude >= 0.1f)
         {
-            readyToJump = false;
+            // Движение и угол поворота
+            float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + camera.transform.eulerAngles.y;
+            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
+            transform.rotation = Quaternion.Euler(0f, angle, 0f);
 
-            Jump();
-
-            Invoke(nameof(ResetJump), jumpCooldown);
+            Vector3 moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
+            controller.Move(moveDirection.normalized * MoveSpeed * Time.deltaTime);
         }
-    }
-
-    private void MovePlayer()
-    {
-        moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
-
-        if (grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
-        else if (!grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
-    }
-    private void SpeedControl()
-    {
-        Vector3 flatVel = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
-
-        if (flatVel.magnitude > moveSpeed)
+        
+        // Код бега
+        if (!isRunning && Input.GetKeyDown(runKey) && direction != null) 
         {
-            Vector3 limitedVel = flatVel.normalized * moveSpeed;
-            rb.velocity = new Vector3(limitedVel.x, rb.velocity.y, limitedVel.z);
+            MoveSpeed = 12f;
+            isRunning = true;
         }
-    }
+        else if ((isRunning && Input.GetKeyDown(runKey)) || direction.magnitude < 0.1f) 
+        {
+            MoveSpeed = 6f;
+            isRunning = false;
+        }
 
-    private void Jump()
-    {
-        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
-
-        rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
-    }
-
-    private void ResetJump()
-    {
-        readyToJump = true;
+        // Падение вниз, если не на земле
+        if (!controller.isGrounded)
+        {
+            Vector3 downMove = new Vector3(0f, -1f, 0f);
+            controller.Move(downMove * moveDown);
+        }
     }
 }
