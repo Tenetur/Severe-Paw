@@ -9,8 +9,8 @@ public class CameraScript : MonoBehaviour
 
     [Header("Îבחמנ ךאלונû")]
 
-    public float defaultFOV = 45f;
-    [SerializeField] private float runFOV = 48f;
+    public float defaultFOV = 45.0f;
+    [SerializeField] private float runFOV;
     [Space]
     [SerializeField] private float toDefaultSpeed = 0.05f;
     [SerializeField] private float toActionSpeed = 0.05f;
@@ -22,6 +22,7 @@ public class CameraScript : MonoBehaviour
     }
     private void Update()
     {
+        runFOV = defaultFOV + 3f;
         if (PlayerMovement.isRunning)
         {
             cam.m_Lens.FieldOfView = Mathf.Lerp(cam.m_Lens.FieldOfView, runFOV, toActionSpeed);
