@@ -1,3 +1,5 @@
+
+using System.Collections;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
@@ -6,21 +8,44 @@ public class PlayerMovement : MonoBehaviour
     public CharacterController controller;
     public Camera cam;
 
-    [SerializeField] private float MoveSpeed = 6f;
-    [SerializeField] private float jumpSpeed = 0.01f;
-    [SerializeField] private float gravity = -0.05f;
+    #region Movement
+
+    [SerializeField] private float MoveSpeed = 6f; 
+    private Vector3 moveDirection;
+    public static bool isRunning { set; get; }
+    private bool IsGrounded => controller.isGrounded;
+
+    #endregion
+
+    #region Jump
+
+    [SerializeField] private float jumpSpeed = 0.2f;
+    private int numberOfJumps;
+    [SerializeField] private int maxNumberOfJumps = 2;
+
+    #endregion
+
+    #region Gravity
+
+    [SerializeField] private float gravity = -0.3f;
     [SerializeField] private float gravityMultiplier = 1f;
     private float velocity;
 
-    private Vector3 moveDirection;
-    public static bool isRunning { set; get; }
-    private bool isGrounded => controller.isGrounded;
+    #endregion
+
+    #region Rotation
 
     private readonly float turnSmoothTime = 0.1f;
     private float turnSmoothVelocity;
 
+    #endregion
+
+    #region KeyCodes
+
     public KeyCode runKey = KeyCode.LeftControl;
     public KeyCode jumpKey = KeyCode.Space;
+
+    #endregion
     private Vector3 GetDirection()
     {
         float horizontal = Input.GetAxisRaw("Horizontal");
@@ -49,19 +74,30 @@ public class PlayerMovement : MonoBehaviour
     }
     private void Gravitation(ref float velocity)
     {
-        if (isGrounded && velocity < 0.0f)
-            velocity = -0.5f;
+        if (IsGrounded && velocity < 0.0f)
+            velocity = -0.1f;
         else
             velocity += gravity * gravityMultiplier * Time.deltaTime;
     }
     private void Jump(ref float velocity)
     {
-        if (Input.GetKeyDown(jumpKey) && isGrounded)
-        {
-            velocity += jumpSpeed;
-        }
+        if (!Input.GetKeyDown(jumpKey)) return;
+        if (!IsGrounded && numberOfJumps >= maxNumberOfJumps) return;
+        if (numberOfJumps == 0) StartCoroutine(WaitForLanding());
+
+        Debug.Log("Jump!");
+        numberOfJumps++;
+        velocity = jumpSpeed;
+
     }
 
+    private IEnumerator WaitForLanding()
+    {
+        yield return new WaitUntil(() => !IsGrounded);
+        yield return new WaitUntil(() => IsGrounded);
+
+        numberOfJumps = 0;
+    }
     void Start()
     {
         controller = GetComponent<CharacterController>();
@@ -69,7 +105,7 @@ public class PlayerMovement : MonoBehaviour
     }
 
     void Update()
-    {
+    {   
         Vector3 direction = GetDirection();
 
         Jump(ref velocity);
@@ -81,7 +117,7 @@ public class PlayerMovement : MonoBehaviour
         {   
             MoveAndRotation(direction, ref moveDirection);
             controller.Move(moveDirection.normalized * MoveSpeed * Time.deltaTime);
-        }   
+        }
         controller.Move(new Vector3(0, velocity, 0));
     }
 }
