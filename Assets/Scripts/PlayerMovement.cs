@@ -4,24 +4,26 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {   
-
-    public CharacterController controller;
-    public Camera cam;
+    public CharacterController CharacterController;
+    public Camera Camera;
 
     #region Movement
 
-    [SerializeField] private float MoveSpeed = 6f; 
+    [SerializeField] private float walkSpeed = 6;
+    [SerializeField] private float runSpeed = 12;
+    private float speed = 0;
     private Vector3 moveDirection;
-    public static bool isRunning { set; get; }
-    private bool IsGrounded => controller.isGrounded;
+    [HideInInspector] public bool IsRunning => isRunning;
+    private bool isRunning = false;
+    [HideInInspector] public bool IsGrounded() => CharacterController.isGrounded;
 
     #endregion
 
     #region Jump
 
     [SerializeField] private float jumpSpeed = 0.2f;
-    private int numberOfJumps;
     [SerializeField] private int maxNumberOfJumps = 2;
+    private int numberOfJumps = 0;
 
     #endregion
 
@@ -46,6 +48,7 @@ public class PlayerMovement : MonoBehaviour
     public KeyCode jumpKey = KeyCode.Space;
 
     #endregion
+
     private Vector3 GetDirection()
     {
         float horizontal = Input.GetAxisRaw("Horizontal");
@@ -54,70 +57,70 @@ public class PlayerMovement : MonoBehaviour
     }
     private void MoveAndRotation(in Vector3 direction, ref Vector3 moveDirection)
     {
-        float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + cam.transform.eulerAngles.y;
+        float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + Camera.transform.eulerAngles.y;
         float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
         transform.rotation = Quaternion.Euler(0f, angle, 0f);
         moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
     }
-    private void Sprint(ref float speed, in Vector3 direction)
+    private void Sprint(Vector3 direction)
     {
-        if (!isRunning && Input.GetKeyDown(runKey) && direction != null)
+        if (direction != null)
         {
-            MoveSpeed = 12f;
-            isRunning = true;
-        }
-        else if ((isRunning && Input.GetKeyDown(runKey)) || direction.magnitude < 0.1f)
-        {
-            MoveSpeed = 6f;
-            isRunning = false;
+            if (!isRunning && Input.GetKeyDown(runKey))
+            {
+                speed = runSpeed;
+                isRunning = true;
+            }
+            else if ((IsRunning && Input.GetKeyDown(runKey)) || direction.magnitude < 0.1f)
+            {
+                speed = walkSpeed;
+                isRunning = false;
+            }
         }
     }
-    private void Gravitation(ref float velocity)
+    private void Gravitation()
     {
-        if (IsGrounded && velocity < 0.0f)
-            velocity = -0.1f;
-        else
-            velocity += gravity * gravityMultiplier * Time.deltaTime;
+        velocity += gravity * gravityMultiplier * Time.deltaTime;
+        velocity = Mathf.Clamp(velocity, gravity, float.MaxValue);
+        CharacterController.Move(new Vector3(0, velocity, 0) * Time.deltaTime);
     }
-    private void Jump(ref float velocity)
+    private void JumpReset()
     {
+        if (IsGrounded())
+        {
+            numberOfJumps = 0;
+            Debug.Log("JumpReset true");
+        }
+    }
+    private void Jump()
+    {   
         if (!Input.GetKeyDown(jumpKey)) return;
-        if (!IsGrounded && numberOfJumps >= maxNumberOfJumps) return;
-        if (numberOfJumps == 0) StartCoroutine(WaitForLanding());
-
+        if (!IsGrounded() && numberOfJumps >= maxNumberOfJumps) return;
+        
         Debug.Log("Jump!");
+
         numberOfJumps++;
         velocity = jumpSpeed;
-
     }
 
-    private IEnumerator WaitForLanding()
+    private void Start()
     {
-        yield return new WaitUntil(() => !IsGrounded);
-        yield return new WaitUntil(() => IsGrounded);
-
-        numberOfJumps = 0;
-    }
-    void Start()
-    {
-        controller = GetComponent<CharacterController>();
-        isRunning = false;
+        CharacterController = GetComponent<CharacterController>();
     }
 
-    void Update()
+    private void Update()
     {   
         Vector3 direction = GetDirection();
-
-        Jump(ref velocity);
-        Gravitation(ref velocity);
-        Sprint(ref MoveSpeed, direction);
+        Sprint(direction);
         MoveAndRotation(direction, ref moveDirection);
+        Jump();
+        Gravitation();
+        JumpReset();
 
         if (direction.magnitude >= 0.1f)
         {   
             MoveAndRotation(direction, ref moveDirection);
-            controller.Move(moveDirection.normalized * MoveSpeed * Time.deltaTime);
+            CharacterController.Move(moveDirection.normalized * speed * Time.deltaTime);
         }
-        controller.Move(new Vector3(0, velocity, 0));
     }
 }
